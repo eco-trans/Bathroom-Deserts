@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore road-level restroom accessibility, bathroom deserts, and nearby public and semi-public facilities across New York City.">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Bathroom Deserts NYC</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://server.arcgisonline.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css?v=15">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#explore" aria-label="Bathroom Deserts NYC home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><rect x="8" y="4" width="11" height="8" rx="2"/><circle cx="16" cy="8" r="1"/><path d="M7 14h16v2c0 5-3.6 9-8 9h-1c-3.9 0-7-3.1-7-7v-4Z"/><path d="M15 25v3m-4 0h9"/></svg>
+      </span>
+      <span>Bathroom Deserts <b>NYC</b></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="#explore">Explore</a>
+      <a href="#findings">Findings</a>
+      <a href="#interpretation">What it means</a>
+      <a href="#methods">Methods</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="explore" class="explorer" aria-labelledby="explore-title">
+      <div id="map" aria-label="Interactive map of restroom accessibility in New York City"></div>
+      <div class="map-wash" aria-hidden="true"></div>
+      <div id="basemap-status" class="basemap-status" role="status" aria-live="polite" hidden></div>
+
+      <aside class="control-panel glass-panel">
+        <h1 id="explore-title">Can you reach a usable restroom?</h1>
+        <p class="intro">Search an NYC location—or click the map—to see the nearest modeled road, its access level, and possible restrooms for a selected time.</p>
+        <p class="site-credit site-credit-top">Website by <a href="https://luyuliu.github.io" target="_blank" rel="noopener">EcoTrans Lab and Luyu Liu</a></p>
+
+        <form id="search-form" class="search-form">
+          <label for="address">Location in New York City</label>
+          <div class="search-row">
+            <input id="address" name="address" type="search" autocomplete="street-address" placeholder="Try: 125th St & Lenox Ave" required>
+            <button type="submit" class="search-button" aria-label="Search location">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+            </button>
+            <button type="button" id="locate-me" class="location-button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v8m-4-4h8"/></svg>
+              <span>Use my location</span>
+            </button>
+          </div>
+          <div class="field-grid">
+            <div class="wide-field">
+              <label for="time-window">Study time window</label>
+              <select id="time-window">
+                <option value="weekday_AM">Weekday · 8–9 AM</option>
+                <option value="weekday_MD">Weekday · 12:30–1:30 PM</option>
+                <option value="weekday_PM" selected>Weekday · 5–6 PM</option>
+                <option value="weekend_AM">Weekend · 8–9 AM</option>
+                <option value="weekend_MD">Weekend · 12:30–1:30 PM</option>
+                <option value="weekend_PM">Weekend · 5–6 PM</option>
+              </select>
+            </div>
+            <div class="wide-field">
+              <label for="eligibility-scenario">Facility eligibility <span id="eligibility-help" class="term" tabindex="0" data-tooltip="Change which restroom candidates count in the tract-level access layer and nearby-options list.">Scenario</span></label>
+              <select id="eligibility-scenario">
+                <option value="baseline" selected>Baseline · all recorded facilities</option>
+                <optgroup label="Entry restriction">
+                  <option value="E1">E1 · free entry + shopping malls</option>
+                  <option value="E2">E2 · E1 + grocery stores</option>
+                  <option value="E3">E3 · E2 + fast food + pharmacies</option>
+                </optgroup>
+                <optgroup label="Physical accessibility">
+                  <option value="A1">A1 · fully accessible</option>
+                  <option value="A2">A2 · fully + partially accessible</option>
+                  <option value="A3">A3 · A2 + unknown status</option>
+                </optgroup>
+                <optgroup label="All-gender requirement">
+                  <option value="G1">G1 · confirmed public all-gender</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+        </form>
+
+        <div class="map-unit-switch" role="group" aria-label="Map unit">
+          <span>Map unit</span>
+          <div>
+            <button type="button" class="active" data-map-unit="tract" aria-pressed="true">Census tracts</button>
+            <button type="button" data-map-unit="road" aria-pressed="false">Roads</button>
+          </div>
+        </div>
+
+        <div id="tract-legend" class="legend continuous-legend" aria-label="Tract accessibility score legend">
+          <b><span id="legend-title" class="term" tabindex="0" data-tooltip="Tract-level E2SFCA accessibility score for the selected facility scenario, multiplied by 100,000 for readability.">Weekday tract access · ×10⁵</span></b>
+          <i class="gradient-bar" aria-hidden="true"></i>
+          <div class="gradient-labels"><span>0 · Lower</span><span>9.81 · Higher</span></div>
+          <div class="activity-key"><i aria-hidden="true"></i><span class="term" tabindex="0" data-tooltip="The lowest 2% of complete tracts by weekly pedestrian activity in the paper (46 tracts; cutoff approximately 77.725). These are masked to avoid interpreting scores inflated by very small demand denominators as genuinely high access.">Extreme low pedestrian activity</span></div>
+          <div class="road-symbols-inline" aria-label="Selected road symbology">
+            <b>Road symbology</b>
+            <span><i class="road-key zero"></i>Zero</span>
+            <span><i class="road-key low"></i>Low</span>
+            <span><i class="road-key served"></i>Served</span>
+          </div>
+        </div>
+        <div id="road-legend" class="legend road-legend" aria-label="Road accessibility class legend" hidden>
+          <b>Road access · selected time</b>
+          <span><i class="road-key zero"></i><span class="term" tabindex="0" data-tooltip="No modeled restroom opportunity within the study catchment for the selected time.">Zero access</span></span>
+          <span><i class="road-key low"></i><span class="term" tabindex="0" data-tooltip="A positive score in the lowest 20% of road accessibility for the selected time.">Low access</span></span>
+          <span><i class="road-key served"></i><span class="term" tabindex="0" data-tooltip="A road above the study’s bathroom-desert threshold for the selected time.">Served</span></span>
+          <small id="road-loading" class="road-loading" hidden>Loading visible roads…</small>
+          <small id="road-zoom-note">Roads appear from zoom level 12.</small>
+        </div>
+      </aside>
+
+      <aside id="result-panel" class="result-panel glass-panel" aria-live="polite" aria-hidden="true">
+        <button id="close-result" class="icon-button" aria-label="Close results">×</button>
+        <p id="result-location" class="eyebrow">SELECTED LOCATION</p>
+        <div class="status-line">
+          <span id="status-icon" class="status-icon"></span>
+          <div>
+            <p id="road-context" class="status-label">Nearest modeled road</p>
+            <h2 id="road-status">Loading…</h2>
+          </div>
+        </div>
+        <div class="result-metrics">
+          <div><span class="term" tabindex="0" data-tooltip="A relative accessibility score combining facility supply, nearby pedestrian demand, routed distance, distance decay, and recorded opening hours.">Access index</span><strong id="access-score">—</strong><small>×10⁵ E2SFCA</small></div>
+          <div><span class="term" tabindex="0" data-tooltip="The road’s rank among NYC roads with positive accessibility in the selected time window. A higher percentile means stronger modeled access.">Road percentile</span><strong id="road-percentile">—</strong><small>positive-score roads</small></div>
+          <div><span>Nearest option</span><strong id="nearest-distance">—</strong><small id="nearest-kind">at selected time</small></div>
+        </div>
+        <div class="interpretation-callout">
+          <span>What this means</span>
+          <p id="road-interpretation"></p>
+        </div>
+        <div id="scenario-result" class="scenario-result"></div>
+        <div class="nearby-heading">
+          <div><span class="eyebrow">POSSIBLE OPTIONS</span><h3>Nearby at this time</h3></div>
+          <span id="option-count"></span>
+        </div>
+        <div id="facility-list" class="facility-list"></div>
+      </aside>
+
+      <div class="map-note"><span>315,568</span> modeled road segments · NYC five boroughs</div>
+    </section>
+
+    <section id="findings" class="findings section-shell">
+      <div class="section-heading split-heading">
+        <div><p class="eyebrow">THE CITYWIDE PATTERN</p><h2>A nearby dot on a map is not the same as dependable access.</h2></div>
+        <p>The model combines routed walking distance, opening hours, pedestrian activity, and competition for facilities. It reveals where nominal supply disappears once time and user needs are considered.</p>
+      </div>
+
+      <div class="big-stat-grid">
+        <article class="big-stat accent-coral">
+          <strong>31.3<sup>%</sup></strong>
+          <h3>of modeled road length is <span class="term term-light" tabindex="0" data-tooltip="Zero-access roads have no modeled restroom opportunity; low-access roads are in the bottom 20% of positive road scores.">zero- or low-access</span></h3>
+          <p><b>88,775 road segments</b> cover 5,936.2 km of bathroom-desert streets: 11.1% with zero access and 20.2% with low access. Evening periods diverged most from the weekly pattern.</p>
+        </article>
+        <article class="big-stat accent-gold">
+          <strong>62.1<sup>%</sup></strong>
+          <h3>of modeled access comes from <span class="term term-light" tabindex="0" data-tooltip="Businesses and other non-municipal facilities that may allow restroom use, but can condition or deny entry.">semi-public facilities</span></h3>
+          <p>They improved 96.2% of tracts and raised mean tract accessibility from <b>1.18 to 3.74</b>—a 217% increase. Overall inequality fell (Gini 0.504 → 0.385), even as the remaining zero-access roads became more concentrated.</p>
+        </article>
+        <article class="big-stat accent-mint">
+          <strong>9.5<sup>%</sup></strong>
+          <h3>of baseline access remains for confirmed public <span class="term term-light" tabindex="0" data-tooltip="Restrooms explicitly recorded as all-gender and available in the public-facility inventory.">all-gender restrooms</span></h3>
+          <p>The strictest free-entry and physical-accessibility sets retained <b>37.5%</b> and <b>60.6%</b> of baseline access. Under G1, 39.5% of modeled tracts fell to zero accessibility.</p>
+        </article>
+        <article class="big-stat accent-blue">
+          <strong>36.98<sup> min</sup></strong>
+          <h3>for a complete restroom journey after one failed first attempt</h3>
+          <p>Fallback coverage was lowest on weekend PM across every facility set. Average total walking time reached <b>27.52 minutes</b> under strict free-entry conditions and 36.98 minutes in the most constrained case; slower walkers faced up to 51.78 minutes.</p>
+        </article>
+      </div>
+
+      <div class="borough-story">
+        <div class="story-copy">
+          <p class="eyebrow">WHERE THE GAP IS LARGEST</p>
+          <h2>The outer boroughs carry the longest stretches of low access.</h2>
+          <p>Staten Island has the highest bathroom-desert road share, while Manhattan has the lowest. Similar citywide totals can hide very different mixtures of roads with no reachable option and roads with only weak access.</p>
+          <div class="insight-chip">Spatial clustering: <span class="term" tabindex="0" data-tooltip="Global Moran’s I measures whether similar values cluster spatially. Positive values indicate clustering; the permutation p-value tests whether the pattern is unlikely under spatial randomness.">Moran’s I</span> = 0.478 · p = 0.001</div>
+        </div>
+        <div class="borough-bars" role="img" aria-label="Bathroom desert share by borough: Staten Island 51.8%, Queens 37.9%, Bronx 26.7%, Brooklyn 26.5%, Manhattan 5.7%">
+          <div><span>Staten Island</span><b style="--value:51.8%"></b><strong>51.8%</strong></div>
+          <div><span>Queens</span><b style="--value:37.9%"></b><strong>37.9%</strong></div>
+          <div><span>Bronx</span><b style="--value:26.7%"></b><strong>26.7%</strong></div>
+          <div><span>Brooklyn</span><b style="--value:26.5%"></b><strong>26.5%</strong></div>
+          <div><span>Manhattan</span><b style="--value:5.7%"></b><strong>5.7%</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="interpretation" class="interpretation-section">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">INTERPRETING THE RESULTS</p>
+          <h2>Bathroom access depends on who, where, and when you are</h2>
+        </div>
+        <div class="interpretation-grid">
+          <article><span>01</span><h3>Time makes deserts move</h3><p>A road can be served in the morning and lose access later as demand changes or facilities close. PM patterns diverged most from the weekly classification.</p><b>Planning response</b><p>Extend hours or staffing where time-specific gaps—not permanent absence—drive the shortfall.</p></article>
+          <article><span>02</span><h3>Conditional supply is fragile</h3><p>Adding semi-public restrooms more than tripled mean tract access, yet made 62.1% of modeled accessibility dependent on businesses and other conditional spaces.</p><b>Planning response</b><p>Use enforceable no-purchase agreements, minimum hours, clear signage, and reporting requirements.</p></article>
+          <article><span>03</span><h3>Eligibility reshapes the map</h3><p>Confirmed all-gender facilities retain only 9.5% of baseline access. Physical-access gains often rely on records whose status is unknown rather than verified.</p><b>Planning response</b><p>Audit and upgrade entrances, fixtures, transfer space, signage, and all-gender designation.</p></article>
+          <article><span>04</span><h3>A backup is part of access</h3><p>After one failed attempt, a person may face a long second walk or no independent alternative—especially when eligible options are scarce.</p><b>Planning response</b><p>Plan for redundancy, not only proximity, and prioritize dependable facilities in persistent zero-access areas.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="methods" class="methods section-shell">
+      <div class="method-heading split-heading">
+        <div><p class="eyebrow">METHOD</p><h2>From restroom records to road-level access.</h2></div>
+        <p>Each road score combines which facilities are open, how far away they are on the pedestrian network, and how much nearby pedestrian demand they serve.</p>
+      </div>
+
+      <div class="method-grid">
+        <article><span>01</span><strong>Build the facility inventory</strong><p>Combine 972 public and 1,888 semi-public restroom candidates, including recorded hours, entry conditions, and accessibility attributes.</p></article>
+        <article><span>02</span><strong>Model six periods</strong><p>Estimate access for weekday and weekend morning, midday, and evening windows using matching facility availability and pedestrian activity.</p></article>
+        <article><span>03</span><strong>Route an 800 m catchment</strong><p>Measure walking distance through the pedestrian network and sample 25 positions along every modeled road segment.</p></article>
+        <article><span>04</span><strong>Calculate <span class="term" tabindex="0" data-tooltip="Enhanced Two-Step Floating Catchment Area balances restroom supply against nearby pedestrian demand, then weights each opportunity by network distance.">E2SFCA</span> access</strong><p>Divide each facility’s supply by surrounding demand, apply Gaussian distance decay, and sum the resulting opportunities for each road.</p></article>
+        <article><span>05</span><strong>Identify bathroom deserts</strong><p>Classify roads with zero access or scores in the lowest 20% of positive values for each time window.</p></article>
+      </div>
+
+      <div class="method-detail">
+        <div>
+          <p class="eyebrow">ACCESS INDEX</p>
+          <h3>Nearby supply, shared demand, and walking distance in one measure.</h3>
+        </div>
+        <div class="formula" aria-label="Road access equals the sum of facility supply-demand ratios multiplied by Gaussian distance weights">
+          <span>Road access</span><b>=</b><span>Σ facility supply ÷ nearby demand</span><b>×</b><span>distance weight</span>
+        </div>
+        <dl>
+          <div><dt>Spatial unit</dt><dd>315,568 road segments</dd></div>
+          <div><dt>Catchment</dt><dd>800 m network distance</dd></div>
+          <div><dt>Distance decay</dt><dd>Gaussian, 800 m scale</dd></div>
+          <div><dt>Desert threshold</dt><dd>Zero or bottom 20% positive</dd></div>
+        </dl>
+      </div>
+
+      <div class="scenario-method eligibility-method">
+        <div><p class="eyebrow">FACILITY-ELIGIBILITY SCENARIOS</p><h3>Three policy questions redraw who can use the network.</h3><p class="method-note">The map recomputes tract access for the selected scenario. Tracts in the paper’s extreme-low pedestrian-activity group are shown in gray.</p></div>
+        <div class="eligibility-cards">
+          <article><strong>Entry restriction</strong><span>E1–E3</span><p><b>E1</b> counts recorded free-entry facilities and shopping malls. <b>E2</b> adds grocery stores. <b>E3</b> also adds fast-food restaurants and pharmacies.</p></article>
+          <article><strong>Physical accessibility</strong><span>A1–A3</span><p><b>A1</b> counts fully accessible facilities. <b>A2</b> adds partially accessible facilities. <b>A3</b> also includes facilities whose status is unknown.</p></article>
+          <article><strong>All-gender requirement</strong><span>G1</span><p><b>G1</b> retains only confirmed public all-gender restrooms.</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div><strong>Bathroom Deserts NYC</strong><p>Research on spatial, temporal, inclusive, and reliable restroom access.</p></div>
+    <p class="site-credit">Website by <a href="https://luyuliu.github.io" target="_blank" rel="noopener">EcoTrans Lab and Luyu Liu</a></p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="app.js?v=export-data-1"></script>
+</body>
+</html>
