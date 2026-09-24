@@ -43,6 +43,8 @@ footer{display:flex;justify-content:space-between;gap:30px;background:#0b1b19;co
 @media(max-width:900px){.team-layout-v2{grid-template-columns:1fr}.team-partners-panel{grid-template-rows:auto}.team-authors-panel{padding:28px}.partner-card{grid-template-columns:150px 1fr}}
 @media(max-width:520px){.team-layout-v2{margin-top:20px}.team-authors-panel{padding:24px}.team-authors-panel li{padding:18px 0}.team-authors-panel li strong{display:block}.team-authors-panel li span{display:block;margin-top:3px}.partner-card{grid-template-columns:1fr;padding:22px}.partner-card img{height:135px;max-width:240px;object-position:left center}.geosciences-partner img{height:80px}}
 /* Team layout refinements */
+.eligibility-method{display:block}
+.preprint-link{display:inline-flex;align-items:center;gap:7px;margin-top:24px;padding:11px 15px;border:1px solid rgba(255,255,255,.3);border-radius:999px;color:#fff;font-size:.78rem;font-weight:800;transition:.2s}.preprint-link:hover{background:var(--mint);border-color:var(--mint);color:var(--ink);transform:translateY(-1px)}
 .team-authors-panel h2{margin-bottom:22px}.team-authors-panel ul{border-top:0}.team-authors-panel li{padding:11px 0;border-bottom:0;line-height:1.4}.team-partners-panel{grid-template-rows:auto 1fr 1fr}.contact-title{font-size:clamp(2.25rem,4vw,4rem);line-height:1;letter-spacing:-.055em;margin:0 0 2px}.partner-card p b{color:var(--ink);font-size:.9rem}
 @media(max-width:520px){.team-authors-panel li{padding:9px 0}.contact-title{margin-top:12px}}
 
