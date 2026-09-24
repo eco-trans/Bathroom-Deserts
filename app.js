@@ -5,7 +5,7 @@ const COLORS = {zero:"#d81b60",low:"#ff7a00",served:"#6d28d9"};
 let activeEligibilityScenario={id:"baseline",family:"Baseline",label:"All recorded facilities",definition:"All public and semi-public restroom candidates in the study inventory"};
 let activeMapUnit="tract";
 
-const map = L.map("map", {zoomControl:false, preferCanvas:true, minZoom:9, maxZoom:19}).setView([40.7128,-74.006], 10);
+const map = L.map("map", {zoomControl:false, preferCanvas:true, minZoom:9, maxZoom:19}).setView([40.7128,-74.006], 11);
 map.createPane("surfacePane");
 map.getPane("surfacePane").style.zIndex=250;
 map.getPane("surfacePane").style.pointerEvents="none";
@@ -417,7 +417,7 @@ function initComparisonMap(){
   leftSelect.value="baseline";
   rightSelect.value=(meta.eligibilityScenarios||[]).some(s=>s.id==="E1")?"E1":"G1";
 
-  compareMap=L.map(mapElement,{zoomControl:true,preferCanvas:false,minZoom:9,maxZoom:16,scrollWheelZoom:false}).setView([40.7128,-74.006],10);
+  compareMap=L.map(mapElement,{zoomControl:true,preferCanvas:false,minZoom:9,maxZoom:16,scrollWheelZoom:false}).setView([40.7128,-74.006],11);
   compareMap.createPane("compareLeftPane");
   compareMap.createPane("compareRightPane");
   const leftPane=compareMap.getPane("compareLeftPane"),rightPane=compareMap.getPane("compareRightPane");
