@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Explore road-level restroom accessibility, bathroom deserts, and nearby public and semi-public facilities across New York City.">
+  <meta name="description" content="Explore road-level restroom accessibility and bathroom deserts across New York City.">
   <title>Bathroom Deserts NYC</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://tile.openstreetmap.org">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=30">
+  <link rel="stylesheet" href="styles.css?v=31">
   <link rel="stylesheet" href="leaflet-side-by-side.css?v=2.2.0">
 </head>
 <body>
@@ -64,7 +64,7 @@
               </select>
             </div>
             <div class="wide-field">
-              <label for="eligibility-scenario">Facility eligibility <span id="eligibility-help" class="term" tabindex="0" data-tooltip="Change which restroom candidates count in the tract-level access layer and nearby-options list.">Scenario</span></label>
+              <label for="eligibility-scenario">Facility eligibility <span id="eligibility-help" class="term" tabindex="0" data-tooltip="Change which restroom candidates count in the tract-level access layer.">Scenario</span></label>
               <select id="eligibility-scenario">
                 <option value="baseline" selected>Baseline · all recorded facilities</option>
                 <optgroup label="Entry restriction">
@@ -128,18 +128,12 @@
         <div class="result-metrics">
           <div><span class="term" tabindex="0" data-tooltip="A relative accessibility score combining facility supply, nearby pedestrian demand, routed distance, distance decay, and recorded opening hours.">Access index</span><strong id="access-score">—</strong><small>×10⁵ E2SFCA</small></div>
           <div><span class="term" tabindex="0" data-tooltip="The road’s rank among NYC roads with positive accessibility in the selected time window. A higher percentile means stronger modeled access.">Road percentile</span><strong id="road-percentile">—</strong><small>positive-score roads</small></div>
-          <div><span>Nearest option</span><strong id="nearest-distance">—</strong><small id="nearest-kind">at selected time</small></div>
         </div>
         <div class="interpretation-callout">
           <span>What this means</span>
           <p id="road-interpretation"></p>
         </div>
         <div id="scenario-result" class="scenario-result"></div>
-        <div class="nearby-heading">
-          <div><span class="eyebrow">POSSIBLE OPTIONS</span><h3>Nearby at this time</h3></div>
-          <span id="option-count"></span>
-        </div>
-        <div id="facility-list" class="facility-list"></div>
       </aside>
 
       <div class="map-note"><span>315,568</span> modeled road segments · NYC five boroughs</div>
@@ -315,8 +309,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="leaflet-side-by-side.js?v=2.2.0"></script>
   <script src="data/meta.js?v=16"></script>
-  <script src="data/facilities.js?v=16"></script>
   <script src="data/tracts.js?v=16"></script>
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=34"></script>
 </body>
 </html>
