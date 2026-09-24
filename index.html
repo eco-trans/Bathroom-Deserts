@@ -9,7 +9,8 @@
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://server.arcgisonline.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="stylesheet" href="leaflet-side-by-side.css?v=2.2.0">
 </head>
 <body>
   <header class="site-header">
@@ -19,12 +20,16 @@
       </span>
       <span>Bathroom Deserts <b>NYC</b></span>
     </a>
-    <nav aria-label="Main navigation">
-      <a href="#explore">Explore</a>
-      <a href="#findings">Findings</a>
-      <a href="#interpretation">What it means</a>
-      <a href="#methods">Methods</a>
-    </nav>
+    <div class="header-actions">
+      <nav aria-label="Main navigation">
+        <a href="#explore">Explore</a>
+        <a href="#compare">Compare</a>
+        <a href="#findings">Findings</a>
+        <a href="#interpretation">What it means</a>
+        <a href="#methods">Methods</a>
+      </nav>
+      <a class="team-button" href="https://luyuliu.github.io" target="_blank" rel="noopener">Meet the team</a>
+    </div>
   </header>
 
   <main>
@@ -36,8 +41,6 @@
       <aside class="control-panel glass-panel">
         <h1 id="explore-title">Can you reach a usable restroom?</h1>
         <p class="intro">Search an NYC location—or click the map—to see the nearest modeled road, its access level, and possible restrooms for a selected time.</p>
-        <p class="site-credit site-credit-top">Website by <a href="https://luyuliu.github.io" target="_blank" rel="noopener">EcoTrans Lab and Luyu Liu</a></p>
-
         <form id="search-form" class="search-form">
           <label for="address">Location in New York City</label>
           <div class="search-row">
@@ -144,6 +147,28 @@
       <div class="map-note"><span>315,568</span> modeled road segments · NYC five boroughs</div>
     </section>
 
+    <section id="compare" class="compare-section">
+      <div class="compare-shell">
+        <div class="compare-heading">
+          <div><p class="eyebrow">COMPARE</p><h2>See how access changes between scenarios.</h2></div>
+          <p>Drag the divider across the map to compare tract-level bathroom accessibility under two facility-eligibility scenarios.</p>
+        </div>
+        <div class="compare-controls" aria-label="Comparison settings">
+          <label>Study time window<select id="compare-time"></select></label>
+          <label>Left scenario<select id="compare-left-scenario"></select></label>
+          <label>Right scenario<select id="compare-right-scenario"></select></label>
+        </div>
+        <div class="compare-card">
+          <div id="compare-map" aria-label="Swipe comparison map of bathroom accessibility scenarios"></div>
+          <div class="compare-map-label compare-map-label-left" id="compare-left-label">Baseline</div>
+          <div class="compare-map-label compare-map-label-right" id="compare-right-label">E1</div>
+          <div class="compare-map-legend" aria-label="Comparison map legend">
+            <b>TRACT ACCESS · ×10⁵</b><span class="gradient-bar"></span><span class="gradient-labels"><span>0 · Lower</span><span>9.81 · Higher</span></span><span class="compare-gray-key"><i></i> Extreme low pedestrian activity</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="findings" class="findings section-shell">
       <div class="section-heading split-heading">
         <div><p class="eyebrow">THE CITYWIDE PATTERN</p><h2>A nearby dot on a map is not the same as dependable access.</h2></div>
@@ -161,10 +186,20 @@
           <h3>of modeled access comes from <span class="term term-light" tabindex="0" data-tooltip="Businesses and other non-municipal facilities that may allow restroom use, but can condition or deny entry.">semi-public facilities</span></h3>
           <p>They improved 96.2% of tracts and raised mean tract accessibility from <b>1.18 to 3.74</b>—a 217% increase. Overall inequality fell (Gini 0.504 → 0.385), even as the remaining zero-access roads became more concentrated.</p>
         </article>
+        <article class="big-stat accent-blue">
+          <strong>37.5<sup>%</sup></strong>
+          <h3>of baseline access remains under strict <span class="term term-light" tabindex="0" data-tooltip="The E1 scenario keeps facilities recorded as free to enter, plus shopping malls.">entry restrictions</span></h3>
+          <p>Under <b>E1</b>, the model retains only restrooms recorded as free to enter, plus facilities in shopping malls.</p>
+        </article>
+        <article class="big-stat accent-coral">
+          <strong>60.6<sup>%</sup></strong>
+          <h3>of baseline access remains under the strict <span class="term term-light" tabindex="0" data-tooltip="The A1 scenario keeps only facilities recorded as fully physically accessible.">physical-accessibility scenario</span></h3>
+          <p>Under <b>A1</b>, the model retains only facilities recorded as fully accessible, revealing the access remaining for people who require an accessible restroom.</p>
+        </article>
         <article class="big-stat accent-mint">
           <strong>9.5<sup>%</sup></strong>
           <h3>of baseline access remains for confirmed public <span class="term term-light" tabindex="0" data-tooltip="Restrooms explicitly recorded as all-gender and available in the public-facility inventory.">all-gender restrooms</span></h3>
-          <p>The strictest free-entry and physical-accessibility sets retained <b>37.5%</b> and <b>60.6%</b> of baseline access. Under G1, 39.5% of modeled tracts fell to zero accessibility.</p>
+          <p>Under <b>G1</b>, 39.5% of modeled tracts fell to zero accessibility.</p>
         </article>
         <article class="big-stat accent-blue">
           <strong>36.98<sup> min</sup></strong>
@@ -207,7 +242,7 @@
 
     <section id="methods" class="methods section-shell">
       <div class="method-heading split-heading">
-        <div><p class="eyebrow">METHOD</p><h2>From restroom records to road-level access.</h2></div>
+        <div><p class="eyebrow">METHOD</p><h2>From points of interest to reliable accessibility</h2></div>
         <p>Each road score combines which facilities are open, how far away they are on the pedestrian network, and how much nearby pedestrian demand they serve.</p>
       </div>
 
@@ -248,10 +283,13 @@
 
   <footer>
     <div><strong>Bathroom Deserts NYC</strong><p>Research on spatial, temporal, inclusive, and reliable restroom access.</p></div>
-    <p class="site-credit">Website by <a href="https://luyuliu.github.io" target="_blank" rel="noopener">EcoTrans Lab and Luyu Liu</a></p>
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=export-data-1"></script>
+  <script src="leaflet-side-by-side.js?v=2.2.0"></script>
+  <script src="data/meta.js"></script>
+  <script src="data/facilities.js"></script>
+  <script src="data/tracts.js"></script>
+  <script src="app.js?v=compare-file-13"></script>
 </body>
 </html>

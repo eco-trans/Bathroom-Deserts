@@ -29,17 +29,23 @@ L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_L
 
 let meta, facilities, tractsData, tractLayer, roadsLayer = L.layerGroup({pane:"roadPane"}).addTo(map), facilityLayer = L.layerGroup().addTo(map);
 let selectedRoadLayer, currentPoint, currentLabel = "Selected point";
+let compareMap, compareLeftLayer, compareRightLayer, compareControl;
 let analysisToken=0;
 let roadRenderToken=0;
 const tileCache = new Map();
+const roadScriptPromises = new Map();
 const availableTiles = new Set();
 const resultPanel = document.querySelector("#result-panel");
 
-Promise.all([
-  fetch(`data/meta.json?v=${DATA_VERSION}`).then(r=>r.json()),
-  fetch(`data/facilities.json?v=${DATA_VERSION}`).then(r=>r.json()),
-  fetch(`data/tracts.geojson?v=${DATA_VERSION}`).then(r=>r.json())
-]).then(([m,f,t])=>{
+const coreData=window.BATHROOM_DATA?.meta&&window.BATHROOM_DATA?.facilities&&window.BATHROOM_DATA?.tracts
+  ? Promise.resolve([window.BATHROOM_DATA.meta,window.BATHROOM_DATA.facilities,window.BATHROOM_DATA.tracts])
+  : Promise.all([
+      fetch(`data/meta.json?v=${DATA_VERSION}`).then(r=>r.json()),
+      fetch(`data/facilities.json?v=${DATA_VERSION}`).then(r=>r.json()),
+      fetch(`data/tracts.geojson?v=${DATA_VERSION}`).then(r=>r.json())
+    ]);
+
+coreData.then(([m,f,t])=>{
   meta=m; facilities=f; tractsData=t;
   m.tiles.forEach(([x,y])=>availableTiles.add(`${x}_${y}`));
   updateEligibilityScenario();
@@ -55,6 +61,7 @@ Promise.all([
       fillOpacity:.82
     })
   }).addTo(map);
+  initComparisonMap();
   if(activeMapUnit==="road"){
     map.removeLayer(tractLayer);
     renderVisibleRoads();
@@ -62,9 +69,13 @@ Promise.all([
 }).catch(()=>showMapError("The research layers could not be loaded."));
 
 function accessibilityColor(properties){
+  return accessibilityColorForScore(properties,tractScenarioScore(properties));
+}
+
+function accessibilityColorForScore(properties,score){
   if(properties.veryLowActivity)return "#a6abb2";
   if(!properties.flow)return "#3f4652";
-  const value=Math.max(0,Math.min(9.81,tractScenarioScore(properties)*100000));
+  const value=Math.max(0,Math.min(9.81,score*100000));
   const stops=[[0,[22,28,45]],[.34,[34,96,126]],[.68,[33,178,151]],[1,[255,209,102]]];
   const t=value/9.81;
   for(let i=0;i<stops.length-1;i++){
@@ -114,7 +125,7 @@ document.querySelector("#eligibility-scenario").addEventListener("change",()=>{
 });
 document.querySelectorAll("[data-map-unit]").forEach(button=>button.addEventListener("click",()=>setMapUnit(button.dataset.mapUnit)));
 document.querySelector("#close-result").addEventListener("click",()=>{resultPanel.classList.remove("open");resultPanel.setAttribute("aria-hidden","true")});
-map.on("click",e=>{currentLabel="Map selection";analyzePoint(e.latlng.lat,e.latlng.lng,map.getZoom()<15)});
+map.on("click",e=>{currentLabel="Map selection";analyzePoint(e.latlng.lat,e.latlng.lng,false)});
 map.on("moveend",()=>{if(activeMapUnit==="road")renderVisibleRoads()});
 
 async function analyzePoint(lat,lon,focus){
@@ -147,9 +158,28 @@ async function loadRoadNeighborhood(lat,lon){
   for(let x=tx-1;x<=tx+1;x++)for(let y=ty-1;y<=ty+1;y++)if(availableTiles.has(`${x}_${y}`))keys.push(`${x}_${y}`);
   const batches=await Promise.all(keys.map(async key=>{
     if(tileCache.has(key))return tileCache.get(key);
-    const data=await fetch(`data/roads/${key}.json`).then(r=>r.json());tileCache.set(key,data);return data;
+    const data=await readRoadTile(key);tileCache.set(key,data);return data;
   }));
   return batches.flat();
+}
+
+async function readRoadTile(key){
+  if(location.protocol!=="file:")return fetch(`data/roads/${key}.json?v=${DATA_VERSION}`).then(r=>r.json());
+  if(window.BATHROOM_ROAD_TILES?.[key])return window.BATHROOM_ROAD_TILES[key];
+  if(roadScriptPromises.has(key))return roadScriptPromises.get(key);
+  const promise=new Promise((resolve,reject)=>{
+    const script=document.createElement("script");
+    script.src=`data/roads-js/${key}.js`;
+    script.onload=()=>{
+      const data=window.BATHROOM_ROAD_TILES?.[key]||[];
+      if(window.BATHROOM_ROAD_TILES)delete window.BATHROOM_ROAD_TILES[key];
+      script.remove();resolve(data);
+    };
+    script.onerror=()=>{script.remove();reject(new Error(`Could not load road tile ${key}`))};
+    document.head.appendChild(script);
+  });
+  roadScriptPromises.set(key,promise);
+  try{return await promise}finally{roadScriptPromises.delete(key)}
 }
 
 function nearestRoad(lat,lon,roads){
@@ -227,7 +257,7 @@ async function renderVisibleRoads(){
   const missingKeys=keys.filter(key=>!tileCache.has(key));
   loadingNote.hidden=missingKeys.length===0;
   await Promise.all(missingKeys.map(async key=>{
-    const data=await fetch(`data/roads/${key}.json?v=${DATA_VERSION}`).then(r=>r.json());
+    const data=await readRoadTile(key);
     tileCache.set(key,data);
   }));
   if(token!==roadRenderToken||activeMapUnit!=="road")return;
@@ -325,12 +355,14 @@ function renderResults({status,score,nearby,tract,time}){
 
 function facilityHtml(item,i){
   const f=item.raw,semi=f[1]===1,walk=walkingMinutes(item.distance);
+  const mapsQuery=f[3]&&/\d/.test(f[3])?`${f[2]}, ${f[3]}, New York, NY`:`${f[2]}, New York City`;
+  const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
   const access=f[10]&&f[10]!=="Unknown"?f[10]:"Access unknown";
   const condition=semi?"Entry conditional":(f[11]==="free"?"Free entry":humanize(f[11]));
   const facilityTip=semi?"A possible restroom in a business or other non-municipal location; entry can be conditional.":"A restroom recorded in the city’s public-facility inventory.";
   const accessTip=access==="Access unknown"?"The source record does not confirm physical accessibility.":"Recorded physical-accessibility status; conditions were not field-verified in real time.";
   const conditionTip=semi?"Use may require a purchase, code, permission, or staff approval.":"Recorded entry condition for this public facility.";
-  return `<article class="facility-item ${semi?"semi":""}"><span class="facility-rank">${i+1}</span><div><h4>${escapeHtml(f[2])}</h4><p>${escapeHtml(f[3]||humanize(f[14]))}</p><div class="facility-tags"><span class="tag term" tabindex="0" data-tooltip="${facilityTip}">${semi?"Semi-public":"Public"}</span><span class="tag term" tabindex="0" data-tooltip="${accessTip}">${escapeHtml(access)}</span><span class="tag term" tabindex="0" data-tooltip="${conditionTip}">${escapeHtml(condition)}</span></div></div><div class="distance">${formatDistance(item.distance)}<small>~${walk} min</small></div></article>`;
+  return `<a class="facility-item ${semi?"semi":""}" href="${mapsUrl}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(f[2])} in Google Maps"><span class="facility-rank">${i+1}</span><div><h4>${escapeHtml(f[2])}</h4><p>${escapeHtml(f[3]||humanize(f[14]))}</p><div class="facility-tags"><span class="tag term" tabindex="0" data-tooltip="${facilityTip}">${semi?"Semi-public":"Public"}</span><span class="tag term" tabindex="0" data-tooltip="${accessTip}">${escapeHtml(access)}</span><span class="tag term" tabindex="0" data-tooltip="${conditionTip}">${escapeHtml(condition)}</span></div></div><div class="distance">${formatDistance(item.distance)}<small>~${walk} min</small><span class="maps-link-label">Google Maps ↗</span></div></a>`;
 }
 
 function updateEligibilityScenario(){
@@ -362,6 +394,84 @@ function updateLegend(){
   const day=document.querySelector("#time-window").value.startsWith("weekend")?"Weekend":"Weekday";
   title.textContent=`${day} ${activeEligibilityScenario.id==="baseline"?"baseline":activeEligibilityScenario.id} tract access · ×10⁵`;
   title.dataset.tooltip=`${activeEligibilityScenario.definition}. The ${day.toLowerCase()} tract-level E2SFCA score is multiplied by 100,000 for readability.`;
+}
+
+function initComparisonMap(){
+  const mapElement=document.querySelector("#compare-map");
+  if(compareMap||!mapElement||!tractsData||!meta)return;
+  const timeSelect=document.querySelector("#compare-time");
+  const leftSelect=document.querySelector("#compare-left-scenario");
+  const rightSelect=document.querySelector("#compare-right-scenario");
+  const times=[
+    ["weekday_AM","Weekday · 8–9 AM"],["weekday_MD","Weekday · 12:30–1:30 PM"],["weekday_PM","Weekday · 5–6 PM"],
+    ["weekend_AM","Weekend · 8–9 AM"],["weekend_MD","Weekend · 12:30–1:30 PM"],["weekend_PM","Weekend · 5–6 PM"]
+  ];
+  timeSelect.innerHTML=times.map(([value,label])=>`<option value="${value}">${label}</option>`).join("");
+  timeSelect.value="weekday_PM";
+  const scenarioOptions=(meta.eligibilityScenarios||[]).map(scenario=>{
+    const name=scenario.id==="baseline"?"Baseline":scenario.id;
+    return `<option value="${escapeHtml(scenario.id)}">${escapeHtml(name)} · ${escapeHtml(scenario.label)}</option>`;
+  }).join("");
+  leftSelect.innerHTML=scenarioOptions;
+  rightSelect.innerHTML=scenarioOptions;
+  leftSelect.value="baseline";
+  rightSelect.value=(meta.eligibilityScenarios||[]).some(s=>s.id==="E1")?"E1":"G1";
+
+  compareMap=L.map(mapElement,{zoomControl:true,preferCanvas:false,minZoom:9,maxZoom:16,scrollWheelZoom:false}).setView([40.7128,-74.006],10);
+  compareMap.createPane("compareLeftPane");
+  compareMap.createPane("compareRightPane");
+  const leftPane=compareMap.getPane("compareLeftPane"),rightPane=compareMap.getPane("compareRightPane");
+  Object.assign(leftPane.style,{zIndex:310,pointerEvents:"none",width:"100%",height:"100%"});
+  Object.assign(rightPane.style,{zIndex:320,pointerEvents:"none",width:"100%",height:"100%"});
+  const leftRenderer=L.svg({pane:"compareLeftPane",padding:.5});
+  const rightRenderer=L.svg({pane:"compareRightPane",padding:.5});
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",{
+    maxZoom:16,attribution:'Tiles © <a href="https://www.esri.com/">Esri</a>'
+  }).addTo(compareMap);
+  compareLeftLayer=L.geoJSON(tractsData,{pane:"compareLeftPane",renderer:leftRenderer,interactive:false,smoothFactor:0,style:feature=>comparisonTractStyle(feature.properties,leftSelect.value,timeSelect.value,"compareLeftPane")}).addTo(compareMap);
+  compareRightLayer=L.geoJSON(tractsData,{pane:"compareRightPane",renderer:rightRenderer,interactive:false,smoothFactor:0,style:feature=>comparisonTractStyle(feature.properties,rightSelect.value,timeSelect.value,"compareRightPane")}).addTo(compareMap);
+  const leftSwipeLayer=L.layerGroup().addTo(compareMap);
+  const rightSwipeLayer=L.layerGroup().addTo(compareMap);
+  leftSwipeLayer.getContainer=()=>leftPane;
+  rightSwipeLayer.getContainer=()=>rightPane;
+  compareControl=L.control.sideBySide(leftSwipeLayer,rightSwipeLayer,{thumbSize:48,padding:5}).addTo(compareMap);
+  compareControl._range.setAttribute("aria-label","Drag to compare the left and right scenarios");
+  L.DomEvent.disableClickPropagation(compareControl._container);
+  L.DomEvent.disableScrollPropagation(compareControl._container);
+  L.DomEvent.on(compareControl._range,"pointerdown pointermove pointerup pointercancel",L.DomEvent.stopPropagation);
+
+  [timeSelect,leftSelect,rightSelect].forEach(control=>control.addEventListener("change",refreshComparisonMap));
+  refreshComparisonMap();
+  setTimeout(()=>compareMap.invalidateSize(),0);
+  if("IntersectionObserver" in window){
+    const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){compareMap.invalidateSize();observer.disconnect()}},{threshold:.1});
+    observer.observe(mapElement);
+  }
+}
+
+function comparisonScenarioScore(properties,scenarioId,time){
+  const day=time.startsWith("weekend")?"weekend":"weekday";
+  return Number(properties?.scenarios?.[scenarioId]?.[day])||0;
+}
+
+function comparisonTractStyle(properties,scenarioId,time,pane){
+  return {pane,stroke:false,fill:true,fillColor:accessibilityColorForScore(properties,comparisonScenarioScore(properties,scenarioId,time)),fillOpacity:.82};
+}
+
+function refreshComparisonMap(){
+  if(!compareMap||!compareLeftLayer||!compareRightLayer)return;
+  const time=document.querySelector("#compare-time").value;
+  const leftId=document.querySelector("#compare-left-scenario").value;
+  const rightId=document.querySelector("#compare-right-scenario").value;
+  compareLeftLayer.setStyle(feature=>comparisonTractStyle(feature.properties,leftId,time,"compareLeftPane"));
+  compareRightLayer.setStyle(feature=>comparisonTractStyle(feature.properties,rightId,time,"compareRightPane"));
+  document.querySelector("#compare-left-label").textContent=comparisonScenarioLabel(leftId);
+  document.querySelector("#compare-right-label").textContent=comparisonScenarioLabel(rightId);
+}
+
+function comparisonScenarioLabel(id){
+  const scenario=(meta.eligibilityScenarios||[]).find(item=>item.id===id);
+  return id==="baseline"?"Baseline · all recorded facilities":`${id} · ${scenario?.label||id}`;
 }
 
 function tractScenarioScore(properties){
